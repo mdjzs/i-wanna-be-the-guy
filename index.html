@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+        html,body {
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            background-color: #87CEFA;
+        }
+        #box {
+            width: 220px;
+            height: 250px;
+            position: absolute;
+            left: 600px;
+            top: 100px;
+            background-color: lightgray;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #word {
+            width: 200px;
+            height: 200px;
+        }
+        #wrap {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top:0;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0,0,0,0.4);
+        }
+        #case {
+            width: 500px;
+            height: 200px;
+            color: orangered;
+            line-height: 200px;
+            font-size: 30px;
+            background-color: white;
+            text-align: center;
+        }
+        #agains {
+            position: absolute;
+            left: 1050px;
+            top: 500px;
+        }
+    </style>
+</head>
+<body onload="onLoad()">
+<canvas id="cvs" width="500" height="400" style="border: 1px solid black"></canvas>
+<div id="box">
+    <div id="word">
+        <span>左右键左右移动，上键跳跃，空格键发射子弹，子弹打储存点储存游戏。<br>
+        游戏共两关卡，到达第二关终点即为过关。<br>
+        碰到尖刺、苹果、地图上边沿均视为死亡,死亡后3s后重生到储存点继续游戏<br>
+        提示:苹果和云朵均会运动。</span>
+    </div>
+
+</div>
+<div id="wrap">
+    <div id="case">
+        <span>过关</span>
+        <button onclick="again()" id="agains">重新开始</button>
+    </div>
+</div>
+<script>
+    var wrap = document.getElementById('wrap');
+    var ctx = cvs.getContext('2d');
+    var game = null;
+
+    function onLoad() {
+        game = new Game();
+        game.update();
+    }
+
+    /*0为空白，1为墙壁，2为储存点，3为树木，4为苹果，5为人物 6为终点  7为云朵
+    8为上尖刺 9为左尖刺 10为下尖刺 11为右尖刺
+    12碰到会弹跳的格子
+    13 过关*/
+    var arr1 = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1,
+        1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 1, 3, 0, 0, 0, 0, 3, 0, 3, 0, 3, 0, 0, 3, 0, 3, 0, 3, 0, 0, 3, 0, 1, 1,
+        1, 0, 0, 4, 0, 0, 0, 0, 0, 4, 0, 0, 4, 0, 4, 0, 0, 0, 4, 4, 0, 0, 0, 4, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 4, 0, 4, 4, 0, 4, 0, 4, 4, 0, 4, 0, 4, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+        1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    ];
+
+
+    var arr2 = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 13, 1, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 1, 1, 1, 1, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        1, 0, 0, 0, 1, 1, 10, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        1, 0, 12, 12, 1, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+        1, 0, 10, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 1,
+        1, 0, 0, 1, 1, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 1,
+        1, 0, 0, 10, 10, 7, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 1,
+        1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 8, 0, 0, 0, 0, 0, 0, 0, 8, 1, 8, 0, 0, 0, 0, 0, 0, 8, 8, 0, 0, 0, 0, 1,
+        1, 1, 8, 8, 8, 8, 8, 8, 8, 1, 1, 1, 8, 8, 8, 8, 8, 8, 1, 1, 8, 8, 8, 8, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    ];
+
+    var arr = arr1;
+
+    function Game() {
+        var _this = this;
+        this.backGround = new BackGround();//背景内容
+        this.apple = [];
+
+        this.rolesinthegame = new RolesInTheGame();//角色
+        this.bullets = [];
+        this.currentCD = 0;
+        this.CD = 10;
+
+        this.topprick = [];//四种尖刺
+        this.leftprick = [];
+        this.bottomprick = [];
+        this.rightprick = [];
+
+        this.cloud = [];//云朵
+        this.jumpgrid = new JumpGrid();
+        this.finished = new Finish();
+        this.topprickimg = 'img/上尖刺.png';
+        this.leftprickimg = 'img/左尖刺.png';
+        this.bottomprickimg = 'img/下尖刺.png';
+        this.rightprickimg = 'img/右尖刺.png';
+        this.applelogin = true;
+        this.pricklogins = true;
+        this.prickaddlogins = false;
+        this.cloudlogins = true;
+        this.cloudaddlogins = false;
+        this.cloudx = [];
+        this.cloudy = [];
+        this.update = function () {
+            ++_this.currentCD;
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            //加载背景
+            _this.backGround.draw();
+            _this.backGround.collapse();
+            /*创建苹果*/
+            if (_this.applelogin) {
+                arr.forEach(function (t, index) {
+                    var ds = 20;
+                    var dx = index % 25;
+                    var dy = parseInt(index / 25);
+                    var x = ds * dx;
+                    var y = ds * dy;
+                    if (t == 4) {
+                        _this.apple.push(new Apple(x, y))
+                    }
+                });
+                _this.applelogin = false;
+            }
+            for (var i = 0; i <= arr.length; i++) {
+                if (arr[i] == 8) {
+                    _this.prickaddlogins = true;
+                    break;
+                }
+                if (arr[i] == 7) {
+                    _this.cloudaddlogins = true;
+                }
+            }
+            /*创建尖刺*/
+            if (_this.pricklogins && _this.prickaddlogins) {
+                arr.forEach(function (t, index) {
+                    var ds = 20;
+                    var dx = index % 25;
+                    var dy = parseInt(index / 25);
+                    var x = ds * dx;
+                    var y = ds * dy;
+                    if (t == 8) {
+                        _this.topprick.push(new Prick(_this.topprickimg, x, y))
+                    }
+                    if (t == 9) {
+                        _this.leftprick.push(new Prick(_this.leftprickimg, x, y))
+                    }
+                    if (t == 10) {
+                        _this.bottomprick.push(new Prick(_this.bottomprickimg, x, y))
+                    }
+                    if (t == 11) {
+                        _this.rightprick.push(new Prick(_this.rightprickimg, x, y))
+                    }
+                });
+                _this.pricklogins = false;
+                _this.prickaddlogins = false;
+            }
+
+            /*创建云朵*/
+            if (_this.cloudlogins && _this.cloudaddlogins) {
+                arr.forEach(function (t, index) {
+                    var ds = 20;
+                    var dx = index % 25;
+                    var dy = parseInt(index / 25);
+                    var x = ds * dx;
+                    var y = ds * dy;
+                    if (t == 7) {
+                        _this.cloud.push(new Cloud(x, y));
+                        _this.cloudx.push(x);
+                        _this.cloudy.push(y);
+                    }
+                });
+
+
+                _this.cloudlogins = false;
+                _this.cloudaddlogins = false;
+            }
+
+            /*储存*/
+            if (_this.backGround.reserve) {
+                /*重置复活点*/
+                _this.rolesinthegame.xs = _this.backGround.reservex;
+                _this.rolesinthegame.ys = _this.backGround.reservey;
+            }
+
+            /*苹果(会掉落)*/
+            _this.apple.forEach(function (t, index) {
+                t.draw();
+                if (index < parseInt(_this.apple.length / 2)) {
+                    t.fallup();
+                }
+                else {
+                    t.falldown();
+                }
+            });
+
+            /*尖刺*/
+            _this.topprick.forEach(function (t2) {
+                t2.draw();
+                t2.collapse();
+            });
+            _this.leftprick.forEach(function (t2) {
+                t2.draw();
+                t2.collapse();
+            });
+            _this.bottomprick.forEach(function (t2) {
+                t2.draw();
+                t2.collapse();
+            });
+            _this.rightprick.forEach(function (t2) {
+                t2.draw();
+                t2.collapse();
+            });
+
+            /*云朵，会移动*/
+            _this.cloud.forEach(function (t2) {
+                t2.draw();
+                t2.collapse();
+            });
+            _this.cloudx = [];
+            _this.cloudy = [];
+            _this.cloud.forEach(function (t2) {
+                _this.cloudx.push(t2.x);
+                _this.cloudy.push(t2.y);
+            });
+            /*有机关的格子*/
+            _this.jumpgrid.draw();
+            _this.jumpgrid.collapse();
+
+            for(var i=0;i<arr.length;i++) {
+                if(arr[i]==13) {
+                    _this.finished.draw();
+                    _this.finished.collapse();
+                }
+            }
+
+            //角色
+            _this.rolesinthegame.draw();
+            _this.rolesinthegame.updatePos();
+
+
+            /*键盘事件*/
+            document.onkeydown = function (e) {
+                if (e.keyCode == 38) {
+                    game.rolesinthegame.rolesjump = true;
+                    game.rolesinthegame.jumpcount++;
+                }
+                if (e.keyCode == 37) {
+                    game.rolesinthegame.rolesleft = true;
+                }
+                if (e.keyCode == 39) {
+                    game.rolesinthegame.rolesright = true;
+                }
+                if (e.keyCode == 32) {
+                    if (_this.currentCD >= _this.CD) {
+                        _this.bullets.push(new Bullet());
+                        _this.currentCD = 0;
+                    }
+
+                }
+                _this.press();
+            };
+            document.onkeyup = function (e) {
+                if (e.keyCode == 38) {
+                    game.rolesinthegame.rolesjump = false;
+                }
+                if (e.keyCode == 37) {
+                    game.rolesinthegame.s = 0;
+                    game.rolesinthegame.rolesleft = false;
+                    game.rolesinthegame.speedx = 0;
+
+                }
+                if (e.keyCode == 39) {
+                    game.rolesinthegame.s = 0;
+                    game.rolesinthegame.rolesright = false;
+                    game.rolesinthegame.speedx = 0;
+                }
+            };
+            if (_this.bullets.length >= 1) {
+                _this.bullets.forEach(function (t2) {
+                    t2.draw();
+                    t2.updatePos();
+                });
+            }
+
+            if (!_this.rolesinthegame.dead&&_this.finished.finishgame == false) {
+                window.requestAnimationFrame(_this.update)
+            }
+            /*死亡并重生*/
+            else if(_this.finished.finishgame == false){
+                var timer = null;
+                var t = 0;
+
+                function dead() {
+                    t += 0.2;
+                    if (t >= 1) {
+                        clearInterval(timer);
+                        _this.rolesinthegame.x = _this.rolesinthegame.xs;
+                        _this.rolesinthegame.y = _this.rolesinthegame.ys;
+                        _this.rolesinthegame.dead = false;
+                        _this.bullets = [];
+                        _this.rolesinthegame.a = 0;
+                        _this.rolesinthegame.speedx = 0;
+                        _this.rolesinthegame.speedy = 0;
+                        _this.rolesinthegame.jumpcount = 0;
+                        /*if (_this.backGround.reservemap) {
+                            arr = _this.backGround.reservemap;
+                        }*/
+                        arr = arr1;
+                        _this.applelogin = true;
+                        _this.apple = [];
+
+                        _this.pricklogins = true;
+                        _this.prickaddlogins = false;
+                        _this.topprick = [];
+                        _this.leftprick = [];
+                        _this.bottomprick = [];
+                        _this.rightprick = [];
+
+                        _this.cloudlogins = true;
+                        _this.cloudaddlogins = false;
+                        _this.cloud = [];
+                        _this.update();
+                    }
+                }
+
+                timer = setInterval(dead, 500);
+            }
+
+        };
+
+        this.press = function () {
+            if (game.rolesinthegame.rolesjump) {
+                if (game.rolesinthegame.jumpcount <= 2) {
+                    game.rolesinthegame.speedy = -10;
+                    game.rolesinthegame.a = 1;
+                }
+            }
+            if (game.rolesinthegame.rolesleft) {
+                game.rolesinthegame.dt = 0;
+                game.rolesinthegame.s = 1;
+                game.rolesinthegame.speedx = -2;
+            }
+            if (game.rolesinthegame.rolesright) {
+                game.rolesinthegame.dt = 1;
+                game.rolesinthegame.s = 1;
+                game.rolesinthegame.speedx = 2
+            }
+        }
+    }
+
+    /*背景*/
+    function BackGround() {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = 'img/地砖.png';
+        this.img1 = new Image();
+        this.img1.src = 'img/储存.png';
+        this.img2 = new Image();
+        this.img2.src = 'img/树木.png';
+        this.img3 = new Image();
+        this.img3.src = 'img/储存点.png';
+        this.img4 = new Image();
+        this.img4.src = 'img/终点.png';
+        this.gridx = [];
+        this.gridy = [];
+        this.size = 20;
+        this.reserve = false;
+        this.reservex = 0;
+        this.reservey = 0;
+        this.reservemap = 0;
+
+        this.finishx = 0;
+        this.finishy = 0;
+        this.draw = function () {
+            _this.gridx = [];
+            _this.gridy = [];
+            ctx.beginPath();
+            arr.forEach(function (t, index, array) {
+                var ds = 20;
+                var dx = index % 25;
+                var dy = parseInt(index / 25);
+                var x = ds * dx;
+                var y = ds * dy;
+                if (t == 1) {
+                    ctx.drawImage(_this.img, x, y, 20, 20);
+                    _this.gridx.push(x);
+                    _this.gridy.push(y);
+                }
+                if (t == 2) {
+                    _this.reservex = x;
+                    _this.reservey = y;
+                    if (_this.reserve) {
+                        ctx.drawImage(_this.img3, x, y, 20, 20);
+                        _this.reservemap = array; //储存地图
+                    }
+                    else {
+                        ctx.drawImage(_this.img1, x, y, 20, 20);
+                    }
+
+                }
+                if (t == 3) {
+                    ctx.drawImage(_this.img2, x, y, 80, 100);
+                }
+                if (t == 6) {
+                    ctx.drawImage(_this.img4, x, y, 20, 20);
+                    _this.finishx = x;
+                    _this.finishy = y;
+                }
+            })
+        };
+        this.collapse = function () {
+            game.bullets.forEach(function (t) {
+                if (t.x >= _this.reservex && t.x <= _this.reservex + 20 && t.y >= _this.reservey && t.y <= _this.reservey + 20) {
+                    _this.reserve = true;
+                }
+            });
+            /*到终点并切换地图*/
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] == 6) {
+                    if (game.rolesinthegame.x >= _this.finishx && game.rolesinthegame.x <= _this.finishx + this.size &&
+                        game.rolesinthegame.y >= _this.finishy && game.rolesinthegame.y <= _this.finishy + this.size) {
+                        game.rolesinthegame.roleslogin = true;
+                        game.applelogin = true;
+                        game.apple = [];
+                        arr = arr2;
+                        game.bullets = [];
+                        _this.reserve = true;
+                        console.log('到终点')
+                    }
+                }
+            }
+
+        }
+    }
+
+    /*苹果*/
+    function Apple(x, y) {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = 'img/苹果.png';
+        this.left = x;
+        this.top = y;
+
+        this.login = false;
+
+        this.draw = function () {
+            ctx.beginPath();
+            ctx.drawImage(_this.img, _this.left, _this.top, 10, 10);
+        };
+        this.fallup = function () {
+            if (game.rolesinthegame.x + 10 == _this.left && game.rolesinthegame.y <= _this.top) {
+                _this.login = true;
+            }
+            if (_this.login) {
+                _this.top -= 20;
+            }
+            if (game.rolesinthegame.x >= _this.left - 10 && game.rolesinthegame.x <= _this.left + 10 &&
+                game.rolesinthegame.y >= _this.top - 10 && game.rolesinthegame.y <= _this.top) {
+                game.rolesinthegame.dead = true;
+            }
+        };
+        this.falldown = function () {
+            if (game.rolesinthegame.x + 10 == _this.left && game.rolesinthegame.y >= _this.top) {
+                _this.login = true;
+            }
+            if (_this.login) {
+                _this.top += 5;
+            }
+            if (game.rolesinthegame.x >= _this.left - 10 && game.rolesinthegame.x <= _this.left + 10 &&
+                game.rolesinthegame.y >= _this.top - 20 && game.rolesinthegame.y <= _this.top - 10) {
+                game.rolesinthegame.dead = true;
+            }
+        };
+    }
+
+    /*人物*/
+    function RolesInTheGame() {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = 'img/人物静止.png';
+        this.img1 = new Image();
+        this.img1.src = 'img/走动.png';
+        this.t = 0;
+        this.dt = 0;
+        this.s = 0;
+        this.left = 0;
+        this.top = 0;
+        this.dead = false;
+
+        this.speedx = 0;
+        this.speedy = 0;
+        this.a = 0;
+        this.size = 20;
+
+        this.x = 0;
+        this.y = 0;
+        this.xs = 0;
+        this.ys = 0;
+
+        this.rolesleft = false;
+        this.rolesright = false;
+        this.rolesjump = false;
+        this.jumpcount = 0;
+        this.roleslogin = true;
+
+        this.draw = function () {
+            arr.forEach(function (t, index) {
+                var ds = 20;
+                var dx = index % 25;
+                var dy = parseInt(index / 25);
+                var x = ds * dx;
+                var y = ds * dy;
+                if (t == 5) {
+                    if (_this.roleslogin) {//只运行一次记录初始复活坐标
+                        _this.x = x;
+                        _this.y = y;
+                        _this.xs = x;
+                        _this.ys = y;
+                        _this.roleslogin = false;
+                    }
+                }
+            });
+
+            ctx.beginPath();
+            var ts = parseInt(_this.t / 10);
+            if (_this.s == 0) {//不动
+                ctx.drawImage(_this.img, _this.img.width * ts / 4, _this.img.height * _this.dt / 2, _this.img.width / 4,
+                    _this.img.height / 2, _this.x, _this.y, 20, 20);
+            }
+            else {//运动
+                ctx.drawImage(_this.img1, _this.img1.width * ts / 5, _this.img1.height * _this.dt / 2, _this.img1.width / 5,
+                    _this.img1.height / 2, _this.x, _this.y, 20, 20);
+            }
+
+            if (_this.t <= 38) {
+                _this.t++
+            }
+            else {
+                _this.t = 0;
+            }
+        };
+
+        this.updatePos = function () {
+            var bottom = _this.y + _this.size;
+            var g_gridx = game.backGround.gridx;
+            var g_gridy = game.backGround.gridy;
+            _this.speedy += _this.a;
+            var newx = _this.x + _this.speedx;
+            var newy = bottom + _this.speedy;
+            /*判断边框*/
+            if (_this.x >= 0 && newx <= 0) {
+                newx = 0;
+            }
+            if (_this.x <= cvs.width - _this.size && newx >= cvs.width - _this.size) {
+                newx = cvs.width - _this.size;
+            }
+            if(_this.y<=0) {
+                _this.dead = true;
+            }
+            /*判断格子碰撞*/
+            //底部
+            for (var i = 0; i < g_gridx.length; i++) {
+                game.bullets.forEach(function (t,index) {
+                    if (t.x >= g_gridx[i] && t.x <= g_gridx[i] + 20 && t.y >= g_gridy[i] && t.y <= g_gridy[i] + 20) {
+                        game.bullets.splice(index,1);
+                    }
+                });
+                if (bottom <= g_gridy[i] && newy >= g_gridy[i]) {
+                    var x = (_this.x - newx) * (g_gridy[i] - newy) / (bottom - newy) + newx;
+                    if (x >= g_gridx[i] - game.backGround.size / 2 && x <= g_gridx[i] + game.backGround.size / 2) {
+                        newy = g_gridy[i];
+                        _this.a = 0;
+                        _this.jumpcount = 0;
+                    }
+                }
+                //侧部
+                if (bottom > g_gridy[i] && _this.y < g_gridy[i] + game.backGround.size) {
+                    if (_this.x >= g_gridx[i] + game.backGround.size && newx <= g_gridx[i] + game.backGround.size) {
+                        newx = g_gridx[i] + game.backGround.size;
+                    }
+                    if (_this.x + _this.size <= g_gridx[i] && newx + _this.size >= g_gridx[i]) {
+                        newx = g_gridx[i] - _this.size;
+                    }
+                }
+                /*if ((bottom <= g_gridy[i] && newy-_this.size >= g_gridy[i])||
+                    (bottom >= g_gridy[i] && newy >= g_gridy[i]&&newy < g_gridy[i] + game.backGround.size)) {
+
+                    if (_this.x >= g_gridx[i] + game.backGround.size && newx <= g_gridx[i] + game.backGround.size) {
+                        //sideblock = true;
+                        newx = g_gridx[i] + game.backGround.size;
+                    }
+                    if (_this.x + _this.size <= g_gridx[i] && newx + _this.size >= g_gridx[i]) {
+                        newx = g_gridx[i] - _this.size;
+                    }
+                }*/
+                //头部碰撞
+                if (_this.x >= g_gridx[i] - game.backGround.size / 2 && _this.x <= g_gridx[i] + game.backGround.size / 2) {
+                    if (_this.y >= g_gridy[i] + game.backGround.size && newy - _this.size <= g_gridy[i] + game.backGround.size) {
+                        newy = g_gridy[i] + game.backGround.size + _this.size;
+                    }
+                }
+            }
+
+            /*判断云朵碰撞*/
+            var g_cloudx = game.cloudx;
+            var g_cloudy = game.cloudy;
+            for(var i=0;i<g_cloudx.length;i++) {
+                if (bottom <= g_cloudy[i] && newy >= g_cloudy[i]) {
+                    var x = (_this.x - newx) * (g_cloudy[i] - newy) / (bottom - newy) + newx;
+                    if (x >= g_cloudx[i] - 10 && x <= g_cloudx[i] + 60-10) {
+                        newy = g_cloudy[i];
+                        _this.a = 0;
+                        _this.jumpcount = 0;
+                    }
+                }
+            }
+            var g_jumpgridx = game.jumpgrid.jumpgridx;
+            var g_jumpgridy = game.jumpgrid.jumpgridy;
+            for(var i=0;i<g_jumpgridx.length;i++) {
+                if (bottom <= g_jumpgridy[i] && newy >= g_jumpgridy[i]) {
+                    var x = (_this.x - newx) * (g_jumpgridy[i] - newy) / (bottom - newy) + newx;
+                    if (x >= g_jumpgridx[i] - 10 && x <= g_jumpgridx[i] + 60-10) {
+                        newy = g_jumpgridy[i];
+                        _this.a = 0;
+                        _this.jumpcount = 0;
+                    }
+                }
+            }
+            _this.y = newy - _this.size;
+            _this.x = newx;
+        }
+    }
+
+    /*尖刺*/
+    function Prick(prickimg, x, y) {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = prickimg;
+        this.x = x;
+        this.y = y;
+        this.size = 20;
+        this.draw = function () {
+            ctx.beginPath();
+            ctx.drawImage(_this.img, _this.x, _this.y, 20, 20);
+        };
+        this.collapse = function () {
+            if (game.rolesinthegame.x >= _this.x - 10 && game.rolesinthegame.x <= _this.x + 10 &&
+                game.rolesinthegame.y >= _this.y - 20 && game.rolesinthegame.y <= _this.y) {
+                game.rolesinthegame.dead = true;
+            }
+        }
+    }
+
+    /*云朵*/
+    function Cloud(x, y) {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = 'img/白云.png';
+        this.x = x;
+        this.y = y;
+
+        this.login = false;
+        this.cloud1 = false;
+        this.cloud2 = false;
+        this.cloud3 = false;
+        this.draw = function () {
+            ctx.beginPath();
+            ctx.drawImage(_this.img, _this.x, _this.y, 60, 20);
+        };
+        this.collapse = function () {
+            if (game.rolesinthegame.x >= _this.x - 10 && game.rolesinthegame.x <= _this.x + 60-10) {
+                if(game.rolesinthegame.y+game.rolesinthegame.size==_this.y) {
+                    _this.login = true;
+                    if(_this.x==380) {
+                        _this.cloud1 = true;
+                    }
+                    else if(_this.x==100) {
+                        _this.cloud2 = true;
+                    }
+                    else if(_this.x==240) {
+                        _this.cloud3 = true;
+                    }
+                    else if(_this.x==20) {
+                        if(game.rolesinthegame.x >= _this.x - 10 && game.rolesinthegame.x <= _this.x + 10) {
+                            game.rolesinthegame.speedy = -15;
+                            game.rolesinthegame.a = 1;
+                        }
+                    }
+                }
+            }
+            if(_this.login) {
+                if(_this.cloud1) {
+                    _this.x--;
+                    _this.y++;
+                }
+                else if(_this.cloud2) {
+                    _this.y++;
+                }
+                else if(_this.cloud3) {
+                    _this.x--;
+                }
+
+            }
+        }
+    }
+
+    /*碰到会弹跳的格子*/
+    function JumpGrid() {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = 'img/地砖.png';
+        this.jumpgridx = [];
+        this.jumpgridy = [];
+
+        this.draw = function () {
+            ctx.beginPath();
+            _this.jumpgridx = [];
+            _this.jumpgridy = [];
+            arr.forEach(function (t, index) {
+                var ds = 20;
+                var dx = index % 25;
+                var dy = parseInt(index / 25);
+                var x = ds * dx;
+                var y = ds * dy;
+                if (t == 12) {
+                    ctx.drawImage(_this.img, x, y, 20, 20);
+                    _this.jumpgridx.push(x);
+                    _this.jumpgridy.push(y);
+                }
+            })
+        };
+        this.collapse = function () {
+            for(var i=0;i<_this.jumpgridx.length;i++) {
+                if(game.rolesinthegame.y+game.rolesinthegame.size==_this.jumpgridy[i]) {
+                    if(game.rolesinthegame.x >= _this.jumpgridx[i] - 10 && game.rolesinthegame.x <= _this.jumpgridx[i] + 10) {
+                        game.rolesinthegame.speedy = -30;
+                        game.rolesinthegame.a = 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /*过关*/
+    function Finish() {
+        var _this = this;
+        this.img = new Image();
+        this.img.src = 'img/终点.png';
+        this.x = 0;
+        this.y = 0;
+        this.size = 20;
+        this.finishgame = false;
+        this.draw = function () {
+            ctx.beginPath();
+            arr.forEach(function (t, index, array) {
+                var ds = 20;
+                var dx = index % 25;
+                var dy = parseInt(index / 25);
+                var x = ds * dx;
+                var y = ds * dy;
+                if (t == 13) {
+                    ctx.drawImage(_this.img, x, y, 20, 20);
+                    _this.x = x;
+                    _this.y = y;
+                }
+            })
+        };
+        this.collapse = function () {
+            if (game.rolesinthegame.x >= _this.x && game.rolesinthegame.x <= _this.x + _this.size &&
+                game.rolesinthegame.y >= _this.y && game.rolesinthegame.y <= _this.y + _this.size) {
+                console.log('到终点了');
+                wrap.style.display = 'flex';
+                _this.finishgame = true;
+            }
+        }
+    }
+
+    /*子弹*/
+    function Bullet() {
+        var _this = this;
+        this.x = game.rolesinthegame.x + 10;
+        this.y = game.rolesinthegame.y + 10;
+        this.dt = game.rolesinthegame.dt;
+        this.draw = function () {
+            ctx.beginPath();
+            ctx.arc(_this.x, _this.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        };
+        this.updatePos = function () {
+            if (_this.dt == 0) {
+                _this.x -= 5;
+            }
+            else {
+                _this.x += 5;
+            }
+        }
+    }
+
+    /*重新开始*/
+    function again() {
+        wrap.style.display = 'none';
+        game.finished.finishgame = false;
+        game.rolesinthegame.roleslogin = true;
+        game.rolesinthegame.dead = false;
+        game.backGround.reserve = false;
+        game.bullets = [];
+        game.rolesinthegame.a = 0;
+        game.rolesinthegame.speedx = 0;
+        game.rolesinthegame.speedy = 0;
+        game.rolesinthegame.jumpcount = 0;
+        arr = arr1;
+        game.applelogin = true;
+        game.apple = [];
+
+        game.pricklogins = true;
+        game.prickaddlogins = false;
+        game.topprick = [];
+        game.leftprick = [];
+        game.bottomprick = [];
+        game.rightprick = [];
+
+        game.cloudlogins = true;
+        game.cloudaddlogins = false;
+        game.cloud = [];
+        game.update();
+    }
+</script>
+</body>
+</html>
